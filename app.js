@@ -1,5 +1,6 @@
 var builder = require('botbuilder');
 var restify = require('restify');
+var botbuilder_azure = require("botbuilder-azure");
 var inMemoryStorage = new builder.MemoryBotStorage();
 // var connector = new builder.ConsoleConnector().listen();
 // var bot = new builder.UniversalBot(connector, function (session) {
@@ -20,30 +21,269 @@ var connector = new builder.ChatConnector({
 
 // Listen for messages from users 
 server.post('/api/messages', connector.listen());
+var tableName = 'botTestdata';
+var storageName = "phonebotmarisionia46a";
+var storageKey = "PHA9uaJRytfGpIvF8LWgCf7dF2fiMdg9RrdDgI1dlf28XPvXlbBuXrWHkoGWmGmOEMA+3WIgj0Ensl8PF4wbcw==";
+var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName,storageKey);
+var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
+var bot = new builder.UniversalBot(connector);
+bot.set('storage', tableStorage);
+var luisAppId = '81827e19-d3ad-4c11-9269-9b3509cc0371';
+var luisAPIKey = 'd231b0cd743640849cf7fdf8bb5ed8ed';
+var luisAPIHostName = process.env.LuisAPIHostName || 'westus.api.cognitive.microsoft.com';
+const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisAppId + '?subscription-key=' + luisAPIKey+'&verbose=true&timezoneOffset=0&q=';
+console.log(LuisModelUrl);
+var recognizer = new builder.LuisRecognizer(LuisModelUrl);
+bot.recognizer(recognizer);
 
-// Receive messages from the user and respond by echoing each message back (prefixed with 'You said:')
-var bot = new builder.UniversalBot(connector, [
-    function (session) {
-        session.beginDialog('userProfile',session.userData.profile);
-    },
-    
-    function(session,results){
-        session.userData.profile = results.response; // save user profile
-        session.send(`Hello ${session.userData.profile.name}! You work for ${session.userData.profile.company}!`);
+bot.dialog('TurnOn',
+    (session) => {
+        session.send('You reached the TurnOn intent. You said \'%s\'.', session.message.text);
+        session.endDialog();
     }
-]).set('storage',inMemoryStorage);
+).triggerAction({
+    matches: 'HomeAutomation.TurnOn'
+});
+bot.dialog('TurnOff',
+    (session) => {
+        session.send('You reached the TurnOff intent. You said \'%s\'.', session.message.text);
+        session.endDialog();
+    }
+).triggerAction({
+    matches: 'HomeAutomation.TurnOff'
+})
+
+bot.set('storage', tableStorage);
+
+bot.on('conversationUpdate', function (message) {
+   
+    if (message.membersAdded) {
+       
+        message.membersAdded.forEach(function (identity) {
+              
+            if (identity.id === message.address.bot.id) {
+               var name = message.user ? message.user.name : null;
+                var reply = new builder.Message()
+                .address(message.address)
+                .text("Hello %s... Thanks for adding me.", name || 'there');
+                bot.send(reply);
+                bot.beginDialog(message.address,'showPromo');
+            }
+            
+        });
+    }
+    // Send a goodbye message when bot is removed
+        if (message.membersRemoved) {
+            message.membersRemoved.forEach(function (identity) {
+                if (identity.id === message.address.bot.id) {
+                    var reply = new builder.Message()
+                        .address(message.address)
+                        .text("Goodbye");
+                    bot.send(reply);
+                    
+                }
+            });
+        }
+    
+    
+});
+
+
+
+bot.on('contactRelationUpdate', function (message) {
+    console.log(message);
+    if (message.action === 'add') {
+        var name = message.user ? message.user.name : null;
+        var reply = new builder.Message()
+                .address(message.address)
+                .text("Hello %s... Thanks for adding me.", name || 'there');
+        bot.send(reply);
+        
+        bot.beginDialog(message.address,'showPromo');
+    }
+    else
+    {
+        console.log(message);
+        bot.send("Welcome!!");
+    }
+});
+
+// Add dialog to handle 'Buy' button click
+bot.dialog('yesDialogButtonClick', [
+    function (session, args, next) {
+        
+          session.beginDialog('showCarousel');
+            
+        
+    }
+]).triggerAction({ matches: /(yes|add)/i });
+
+bot.dialog('yeahDialogButtonClick', [
+    function (session, args, next) {
+        
+          session.send('Ok');
+            
+        
+    }
+]).triggerAction({ matches: /(yeah)/i });
+
+
+
+bot.dialog('showCarousel',function(session){
+    var msg = new builder.Message(session);
+    msg.attachmentLayout(builder.AttachmentLayout.carousel)
+    msg.attachments([
+        new builder.HeroCard(session)
+            .title("Classic SmartPhones")
+            .subtitle("SmartPhones")
+            .text("Midrange SmartPhones")
+            .images([builder.CardImage.create(session, 'https://www.samsung.com/us/support/get-started/assets/images/edge-plus.png')])
+            .buttons([
+                builder.CardAction.imBack(session, "yeah", "Yes"),
+                builder.CardAction.imBack(session, "nope", "No")
+            ]),
+        new builder.HeroCard(session)
+            .title("Classic SmartPhones")
+            .subtitle("SmartPhones")
+            .text("Midrange SmartPhones")
+            .images([builder.CardImage.create(session, 'https://www.samsung.com/us/support/get-started/assets/images/galaxy-s7.png')])
+            .buttons([
+                builder.CardAction.imBack(session, "yeah", "Yes"),
+                builder.CardAction.imBack(session, "nope", "No")
+            ])
+            ,
+        new builder.HeroCard(session)
+            .title("Classic SmartPhones")
+            .subtitle("SmartPhones")
+            .text("Midrange SmartPhones")
+            .images([builder.CardImage.create(session, 'https://www.91-img.com/pictures/samsung-galaxy-j2-ace-mobile-phone-large-1.jpg')])
+            .buttons([
+                builder.CardAction.imBack(session, "yeah", "Yes"),
+                builder.CardAction.imBack(session, "nope", "No")
+            ])
+             ,
+        new builder.HeroCard(session)
+            .title("Classic SmartPhones")
+            .subtitle("SmartPhones")
+            .text("Midrange SmartPhones")
+            .images([builder.CardImage.create(session, 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR30j1nUNC6dbn44TEHunf8NhvzEhFY6cT_E9TfN5FWuhwbvaY7')])
+            .buttons([
+                builder.CardAction.imBack(session, "yeah", "Yes"),
+                builder.CardAction.imBack(session, "nope", "No")
+            ])
+    ]);
+    session.send(msg).endDialog();
+});
+
+bot.dialog('noDialogButtonClick', [
+    function (session, args, next) {
+        
+            // Invalid product
+           
+            session.beginDialog('showButtons');
+        
+    }
+]).triggerAction({ 
+        matches: 'No.Device'
+    });
+
+bot.dialog('showButtons',function(session){
+    var msg = new builder.Message(session);
+    
+    msg.attachmentLayout(builder.AttachmentLayout.carousel);
+    msg.attachments([
+        new builder.HeroCard(session)
+            
+            .text("Do you want to see other devices?")
+            .buttons([
+                builder.CardAction.imBack(session, "yes", "Yes"),
+                builder.CardAction.imBack(session, "no", "No")
+            ])
+    ]);
+    session.send(msg).endDialog();
+})
+// Add dialog to return list of shirts available
+bot.dialog('showPromo', function (session) {
+    var msg = new builder.Message(session);
+    
+    msg.attachmentLayout(builder.AttachmentLayout.carousel)
+    msg.attachments([
+        new builder.HeroCard(session)
+            .title("Promotions")
+            .text("Hi, I saw you like my offer  😊 do you want to proceed  with the payment?")
+            
+            .images([builder.CardImage.create(session, 'https://www.apkmirror.com/wp-content/uploads/2018/02/5a923158e6749.png')])
+            .buttons([
+                builder.CardAction.imBack(session, "yes", "Yes"),
+                builder.CardAction.imBack(session, "no", "No")
+            ])
+    ]);
+    session.send(msg).endDialog();
+});
+
+
+
+bot.dialog('showVideo',function(session){
+    var msg = new builder.Message(session);
+    //msg.addAttachment({contentType: 'video/mp4', contentUrl: 'https://youtu.be/A9Vu9n7YxrI'});
+    msg.attachmentLayout(builder.AttachmentLayout.carousel);
+    msg.attachments([
+      new builder.VideoCard(session)
+        .title('Vivacom Promotions')
+        .subtitle('by Vivacom')
+        .autostart('true')
+        
+        .text('Vivacom')
+        .image(builder.CardImage.create(session, 'https://img.youtube.com/vi/Nl_ZOWJZfyY/0.jpg'))
+        .media([
+            { url: 'http://115.249.145.115:7073/Download/HuaweiPSmartVIVACOM.mp4' }
+        ])
+        
+    ]);
+    session.send(msg).endDialog();
+});
+
+
+bot.dialog('showOffers',[
+    function(session){
+        var msg = new builder.Message(session);
+        msg.attachmentLayout(builder.AttachmentLayout.carousel);
+         msg.attachments([
+             new builder.HeroCard(session)
+            .title("Promotions")
+            
+            .text("Hi, I saw you like my offer  😊 do you want to proceed  with the payment?")
+            .images([builder.CardImage.create(session, 'https://www.apkmirror.com/wp-content/uploads/2018/02/5a923158e6749.png')])
+            .buttons([
+                builder.CardAction.imBack(session, "YES", "YES"),
+                builder.CardAction.imBack(session, "NO", "NO")
+            ])
+         ]);
+         session.send(msg).endDialog();
+    }
+]);
+
+
+
 
 bot.dialog('userProfile',[
     function(session,args,next){
+        session.sendTyping();
         session.dialogData.profile = args || {}; //set profile or create the object.
         
         if(!session.dialogData.profile.name){
-            session.send("Let us know about you!!");
-            builder.Prompts.text(session,'What is your name?');
+            setTimeout(function () {
+                session.send("Let us know about you!!");
+                builder.Prompts.text(session,'What is your name?');
+            },3000);
+            
         }
         else
         {
-            session.send("As per our prior interactions we know you!!");
+            setTimeout(function () {
+                session.send("As per our prior interactions we know you!!");
+            },3000);
+            
             next();//skip if we have user name 
         }
     },
