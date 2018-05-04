@@ -1,11 +1,63 @@
 var builder = require('botbuilder');
 var restify = require('restify');
 var botbuilder_azure = require("botbuilder-azure");
+var sql = require('mssql');
 var inMemoryStorage = new builder.MemoryBotStorage();
 // var connector = new builder.ConsoleConnector().listen();
 // var bot = new builder.UniversalBot(connector, function (session) {
 //     session.send("You said: %s", session.message.text);
 // });
+var config = {
+    server: '10.0.10.60\\MSSQLSERVER16',
+    database: 'botDB',
+    user: 'sa',
+    password: 'sap@123'
+};
+
+//SQL Server 
+function insertRow(BotMessage,userName) {
+    //2.
+    console.log("Insert DB: "+BotMessage+", UserName: "+userName );
+    var dbConn = new sql.Connection(config);
+    //3.
+    
+    dbConn.connect().then(function () {
+        //4.
+        var transaction = new sql.Transaction(dbConn);
+        //5.
+        transaction.begin().then(function () {
+            //6.
+            var request = new sql.Request(transaction);
+            
+            //7.
+            request.query(`Insert into tbl_Bot_Info (UserName,BotMessage) values ('${userName}','${BotMessage}')`)
+        .then(function () {
+                //8.
+                transaction.commit().then(function (recordSet) {
+                    console.log(recordSet);
+                    dbConn.close();
+                }).catch(function (err) {
+                    //9.
+                    console.log("Error in Transaction Commit " + err);
+                    dbConn.close();
+                });
+            }).catch(function (err) {
+                //10.
+                console.log("Error in Transaction Begin " + err);
+                dbConn.close();
+            });
+             
+        }).catch(function (err) {
+            //11.
+            console.log(err);
+            dbConn.close();
+        });
+    }).catch(function (err) {
+        //12.
+        console.log(err);
+    });
+}
+//----------
 
 // Setup Restify Server
 var server = restify.createServer();
@@ -21,13 +73,28 @@ var connector = new builder.ChatConnector({
 
 // Listen for messages from users 
 server.post('/api/messages', connector.listen());
-var tableName = 'botTestdata';
-var storageName = "phonebotmarisionia46a";
-var storageKey = "PHA9uaJRytfGpIvF8LWgCf7dF2fiMdg9RrdDgI1dlf28XPvXlbBuXrWHkoGWmGmOEMA+3WIgj0Ensl8PF4wbcw==";
-var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName,storageKey);
-var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
 var bot = new builder.UniversalBot(connector);
-bot.set('storage', tableStorage);
+// var tableName = 'botTestdata';
+// var storageName = "phonebotmarisionia46a";
+// var storageKey = "PHA9uaJRytfGpIvF8LWgCf7dF2fiMdg9RrdDgI1dlf28XPvXlbBuXrWHkoGWmGmOEMA+3WIgj0Ensl8PF4wbcw==";
+// var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName,storageKey);
+// var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
+ 
+// bot.set('storage', tableStorage);
+
+var documentDbOptions = {
+    host: 'https://vivacomdb.documents.azure.com:443/', 
+    masterKey: 'LucDvFRsljjPYAJyYixriXLpmu1C1QPKl7E4fWhZpAGtXsTYRCp4L97URKS1IQA3PbylqPWddc0UuPPLb1iACA==', 
+    database: 'botdocs',   
+    collection: 'botdata'
+};
+
+var docDbClient = new botbuilder_azure.DocumentDbClient(documentDbOptions);
+
+var cosmosStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, docDbClient);
+
+bot.set('storage', cosmosStorage);
+
 var luisAppId = '81827e19-d3ad-4c11-9269-9b3509cc0371';
 var luisAPIKey = 'd231b0cd743640849cf7fdf8bb5ed8ed';
 var luisAPIHostName = process.env.LuisAPIHostName || 'westus.api.cognitive.microsoft.com';
@@ -35,6 +102,37 @@ const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisApp
 console.log(LuisModelUrl);
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
 bot.recognizer(recognizer);
+var msg = "";
+const logBotConversation = (event) => {
+    for(var i = 0; i < event.attachments.length; i++) {
+        var obj = event.attachments[i];
+    
+        console.log(obj.content.text);
+        msg = obj.content.text;
+    }
+    insertRow(msg,event.address.user.name);
+    console.log('BotMessage: ' + msg + ', user: ' + event.address.user.name);
+    
+    
+};
+const logUserConversation = (session) => {
+    console.log('message: ' + session.message.text );
+};
+
+bot.use({
+    receive: function (event, next) {
+        logBotConversation(event);
+        next();
+    },
+    send: function (event, next) {
+        logBotConversation(event);
+        next();
+    },
+    botbuilder: function (session, next) {
+        logUserConversation(session);
+        next();
+    }
+});
 
 bot.dialog('TurnOn',
     (session) => {
@@ -53,7 +151,7 @@ bot.dialog('TurnOff',
     matches: 'HomeAutomation.TurnOff'
 })
 
-bot.set('storage', tableStorage);
+
 
 bot.on('conversationUpdate', function (message) {
    
@@ -88,7 +186,8 @@ bot.on('conversationUpdate', function (message) {
     
 });
 
-
+bot.set(`persistUserData`, true);
+bot.set(`persistConversationData`, true);
 
 bot.on('contactRelationUpdate', function (message) {
     console.log(message);
