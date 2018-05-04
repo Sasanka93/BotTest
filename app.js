@@ -110,6 +110,7 @@ const logBotConversation = (event) => {
         console.log(obj.content.text);
         msg = obj.content.text;
     }
+    
     insertRow(msg,event.address.user.name);
     console.log('BotMessage: ' + msg + ', user: ' + event.address.user.name);
     
