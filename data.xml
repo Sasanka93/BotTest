@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nameSet>
+    <welcomeAction>
+        <text>Hello Sasanka Thanks for adding me.</text>
+    </welcomeAction>
+    <offerAction>
+        <text>Hi, I saw you like my offer  😊 do you want to proceed  with the payment!?</text>
+        <image>http://simpleicon.com/wp-content/uploads/phone-volume.png</image>
+    </offerAction>
+    <deleteAction>
+        <text>Deleted</text>
+    </deleteAction>
+</nameSet>

@@ -2,11 +2,45 @@ var builder = require('botbuilder');
 var restify = require('restify');
 var botbuilder_azure = require("botbuilder-azure");
 var sql = require('mssql');
-var inMemoryStorage = new builder.MemoryBotStorage();
-// var connector = new builder.ConsoleConnector().listen();
-// var bot = new builder.UniversalBot(connector, function (session) {
-//     session.send("You said: %s", session.message.text);
-// });
+var express = require('express'); 
+var app = express(); 
+var xml2js = require('xml2js');
+var libxmljs = require("libxmljs");
+fs = require('fs');
+
+console.log('Server started');
+global.xmlData="";
+var parser = new xml2js.Parser();
+
+
+//----parse XML ---//
+        var promise1 = new Promise(function(resolve, reject) {
+            fs.readFile(__dirname + '/data.xml', function(err, data) {
+                parser.parseString(data, function (err, result) {
+                console.dir(result);
+                global.xmlData =  result ;
+                
+                var jsonResult = JSON.stringify(result);
+               
+                resolve(global.xmlData);
+                // console.log(jsonResult);
+                // console.log(result.nameSet.addAction[0].text[0]);
+                // console.log('Done');
+            });
+        });
+      });   
+      promise1.then(function(value){
+        console.log("XMLDATA: "+ global.xmlData);
+      }) 
+    
+// ---- parse XML ---//
+    
+
+// var inMemoryStorage = new builder.MemoryBotStorage();
+var connector = new builder.ConsoleConnector().listen();
+// // var bot = new builder.UniversalBot(connector, function (session) {
+// //     session.send("You said: %s", session.message.text);
+// // });
 var config = {
     server: '10.0.10.60\\MSSQLSERVER16',
     database: 'botDB',
@@ -57,15 +91,15 @@ function insertRow(BotMessage,userName) {
         console.log(err);
     });
 }
-//----------
+// //----------
 
-// Setup Restify Server
+// // Setup Restify Server
 var server = restify.createServer();
-server.listen(process.env.port || process.env.PORT || 3978, function () {
+server.listen(process.env.port || process.env.PORT || 3000, function () {
     console.log('%s listening to %s', server.name, server.url);
 });
 
-// Create chat connector for communicating with the Bot Framework Service
+// // Create chat connector for communicating with the Bot Framework Service
 var connector = new builder.ChatConnector({
     appId: '27d68a41-2c2a-4348-81c4-8fac8ad6fd6d',
     appPassword: 'jiCMKY62#howetKMI535:?;'
@@ -74,26 +108,7 @@ var connector = new builder.ChatConnector({
 // Listen for messages from users 
 server.post('/api/messages', connector.listen());
 var bot = new builder.UniversalBot(connector);
-// var tableName = 'botTestdata';
-// var storageName = "phonebotmarisionia46a";
-// var storageKey = "PHA9uaJRytfGpIvF8LWgCf7dF2fiMdg9RrdDgI1dlf28XPvXlbBuXrWHkoGWmGmOEMA+3WIgj0Ensl8PF4wbcw==";
-// var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName,storageKey);
-// var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
- 
-// bot.set('storage', tableStorage);
 
-var documentDbOptions = {
-    host: 'https://vivacomdb.documents.azure.com:443/', 
-    masterKey: 'LucDvFRsljjPYAJyYixriXLpmu1C1QPKl7E4fWhZpAGtXsTYRCp4L97URKS1IQA3PbylqPWddc0UuPPLb1iACA==', 
-    database: 'botdocs',   
-    collection: 'botdata'
-};
-
-var docDbClient = new botbuilder_azure.DocumentDbClient(documentDbOptions);
-
-var cosmosStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, docDbClient);
-
-bot.set('storage', cosmosStorage);
 
 var luisAppId = '81827e19-d3ad-4c11-9269-9b3509cc0371';
 var luisAPIKey = 'd231b0cd743640849cf7fdf8bb5ed8ed';
@@ -155,7 +170,7 @@ bot.dialog('TurnOff',
 
 
 bot.on('conversationUpdate', function (message) {
-   
+    console.log("XMLDATA IN CONTACT ADD: "+ xmlData);
     if (message.membersAdded) {
        
         message.membersAdded.forEach(function (identity) {
@@ -164,7 +179,7 @@ bot.on('conversationUpdate', function (message) {
                var name = message.user ? message.user.name : null;
                 var reply = new builder.Message()
                 .address(message.address)
-                .text("Hello %s... Thanks for adding me.", name || 'there');
+                .text(xmlData.nameSet.welcomeAction[0].text[0]);
                 bot.send(reply);
                 bot.beginDialog(message.address,'showPromo');
             }
@@ -190,9 +205,12 @@ bot.on('conversationUpdate', function (message) {
 bot.set(`persistUserData`, true);
 bot.set(`persistConversationData`, true);
 
+console.log("Contact ADD: "+xmlData);
 bot.on('contactRelationUpdate', function (message) {
+    
     console.log(message);
     if (message.action === 'add') {
+       
         var name = message.user ? message.user.name : null;
         var reply = new builder.Message()
                 .address(message.address)
@@ -310,9 +328,9 @@ bot.dialog('showPromo', function (session) {
     msg.attachments([
         new builder.HeroCard(session)
             .title("Promotions")
-            .text("Hi, I saw you like my offer  😊 do you want to proceed  with the payment?")
+            .text(xmlData.nameSet.offerAction[0].text[0])
             
-            .images([builder.CardImage.create(session, 'https://www.apkmirror.com/wp-content/uploads/2018/02/5a923158e6749.png')])
+            .images([builder.CardImage.create(session, xmlData.nameSet.offerAction[0].image[0])])
             .buttons([
                 builder.CardAction.imBack(session, "yes", "Yes"),
                 builder.CardAction.imBack(session, "no", "No")
